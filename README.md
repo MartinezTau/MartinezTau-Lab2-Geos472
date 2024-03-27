@@ -8,4 +8,4 @@ By incorperating interactive elements provided by mapbox.jl, such as mouse-over 
 
 Where this map has alot of room to improve on, is further focusing on the code associated with the mapping directions. While I wasn't able to fuigure it out on my own, addapting the code to where the user can input their address as the start point, as well as automatically map the shortest distance to the nearest hospital, would allow for a much better intereactive and information focused experience, providing even more insight into the data.
 
-interesting screenshot: ![Uploading Screenshot - Lab2.png…]()
+interesting screenshot: ![](Screenshot - Lab2.png)
