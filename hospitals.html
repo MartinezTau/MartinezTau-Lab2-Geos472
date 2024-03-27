@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Display a map with a custom style</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+<style>
+body { margin: 0; padding: 0; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  
+  .map-overlay {
+        position: absolute;
+        font-family: sans-serif;
+        margin-bottom: 35px;
+        margin-left: 5px;
+        padding: 5px;
+        width: 80%;
+        font-size: 14px;
+        color: #0A0A0A;
+      border-radius: 3px;
+      }
+  
+  .data {
+  position: absolute;
+  bottom: 40px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  margin-right: 40px;
+  font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+  border: 2px solid black;
+  overflow: auto;
+  width: 39%;
+  background-color: #fff;
+  border-radius: 3px;
+}
+  #instructions {
+  position: absolute;
+  right: 5px;
+  margin-left: 10px;
+  width: 25%;
+  top: 0;
+  bottom: 60%;
+  padding: 20px;
+  background-color: #fff;
+  overflow-y: scroll;
+  font-family: sans-serif;
+}
+  
+</style>
+</head>
+  
+  <body>
+<div id="map"></div>
+<div class='map-overlay' id='features'><h2>Driving To Hospitals From UBC Geography</h2>
+  <div id='pd'><p>Data provided BC Open Data Portal</p></div></div>
+  <div class='data'>
+  <div><strong>Hospital Information:</strong> <span id='info'></span></div>
+</div>
+    <div id="instructions"></div>
+
+    
+<script>
+	mapboxgl.accessToken = 'pk.eyJ1IjoiZGllZ29tdHoiLCJhIjoiY2x0ZmpzM3NmMGljdTJpbGdoeTdya2xxeCJ9.X91TrDAPFEiiT8rpjGLvPA';
+    const map = new mapboxgl.Map({
+        container: 'map', // container ID
+        style:
+'mapbox://styles/diegomtz/clu9b0vbu02el01oickzic80s', // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+        center: [-123.060, 49.23], // starting position
+        zoom: 9.7 // starting zoom
+    });
+  
+    map.on('load', () => {
+// make a pointer cursor
+map.getCanvas().style.cursor = 'default';
+      
+    map.on('mousemove', (e) => {
+const local = map.queryRenderedFeatures(e.point, {
+layers: ['symbols']
+             
+});
+document.getElementById('info').innerHTML = local.length
+? `<h3>City: ${local[0].properties.CITY}</h3><p><strong><em>${local[0].properties.STREET_NUMBER} </p>`
+: `<p>Hover Over a Point</p>`;
+});
+      });
+
+  const start = [-123.25600, 49.26608];
+
+  // create a function to make a directions request
+// create a function to make a directions request
+async function getRoute(end) {
+  // make a directions request using cycling profile
+  // an arbitrary start will always be the same
+  // only the end or destination will change
+  const query = await fetch(
+    `https://api.mapbox.com/directions/v5/mapbox/driving/${start[0]},${start[1]};${end[0]},${end[1]}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`,
+    { method: 'GET' }
+  );
+  const json = await query.json();
+  const data = json.routes[0];
+  const route = data.geometry.coordinates;
+  const geojson = {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'LineString',
+      coordinates: route
+    }
+  };
+  // if the route already exists on the map, we'll reset it using setData
+  if (map.getSource('route')) {
+    map.getSource('route').setData(geojson);
+  }
+  // otherwise, we'll make a new request
+  else {
+    map.addLayer({
+      id: 'route',
+      type: 'line',
+      source: {
+        type: 'geojson',
+        data: geojson
+      },
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#3887be',
+        'line-width': 5,
+        'line-opacity': 0.75
+      }
+    });
+  }
+  // get the sidebar and add the instructions
+const instructions = document.getElementById('instructions');
+const steps = data.legs[0].steps;
+
+let tripInstructions = '';
+for (const step of steps) {
+  tripInstructions += `<li>${step.maneuver.instruction}</li>`;
+}
+instructions.innerHTML = `<p><strong>Trip duration: ${Math.floor(
+  data.duration / 60
+)} min </strong></p><ol>${tripInstructions}</ol>`;
+}
+
+map.on('load', () => {
+  // make an initial directions request that
+  // starts and ends at the same location
+  getRoute(start);
+
+  // Add starting point to the map
+  map.addLayer({
+    id: 'point',
+    type: 'circle',
+    source: {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Point',
+              coordinates: start
+            }
+          }
+        ]
+      }
+    },
+    paint: {
+      'circle-radius': 6,
+      'circle-color': '#3887be'
+    }
+  });
+  map.on('click', (event) => {
+  const coords = Object.keys(event.lngLat).map((key) => event.lngLat[key]);
+  const end = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Point',
+          coordinates: coords
+        }
+      }
+    ]
+  };
+  if (map.getLayer('end')) {
+    map.getSource('end').setData(end);
+  } else {
+    map.addLayer({
+      id: 'end',
+      type: 'circle',
+      source: {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'Point',
+                coordinates: coords
+              }
+            }
+          ]
+        }
+      },
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#f30'
+      }
+    });
+  }
+  getRoute(coords);
+});
+});
+  
+</script>
+
+</body>
+</html>
